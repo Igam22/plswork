@@ -456,6 +456,9 @@ class DistributedChatServer:
         if msg_type == MessageType.CLIENT_JOIN:
             self._handle_client_join(message, addr)
         elif msg_type == MessageType.CLIENT_CHAT:
+            if sender_uuid not in client_view:
+                client_view[sender_uuid] = ClientInfo(name='Unknown', address=addr, join_time=datetime.now())
+                print(f"[Leader] 📥 Registered rejoining client: {sender_uuid}")
             self._handle_client_chat(message, addr)
         elif msg_type == MessageType.CLIENT_QUIT:
             self._handle_client_quit(message, addr)
@@ -1099,3 +1102,22 @@ def main():
 
 if __name__ == "__main__":
     main()
+ try:
+     def retry_discovery_and_connect(client_uuid, name, client_socket):
+    for _ in range(MAX_CLIENT_RETRIES):
+        print("[Client] 🔄 Attempting to rediscover leader...")
+        send_discovery_message(client_uuid, name, client_socket)
+        time.sleep(CLIENT_RETRY_TIMEOUT)
+    print("[Client] ❌ Could not reconnect after leader failure.")
+
+def send_discovery_message(client_uuid, name, client_socket):
+    join_message = {
+        'type': MessageType.CLIENT_JOIN.value,
+        'uuid': client_uuid,
+        'name': name
+    }
+    data = pickle.dumps(join_message)
+    client_socket.sendto(data, (MULTICAST_GROUP_IP, MULTICAST_PORT))
+ except Exception as e:
+     print('[Client] ❌ Failed to send. Retrying...')
+     retry_discovery_and_connect(client_uuid, name, client_socket)
